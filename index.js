@@ -1,10 +1,13 @@
 const http = require('http');
-// const app = require('express')();
+var fs = require('fs');
 const websocketServer = require('websocket').server;
 
 const PORT = process.env.PORT || 8000;
-const INDEX = '/index.html';
-const httpServer = http.createServer();
+// const INDEX = fs.readFileSync('index.html');
+const httpServer = http.createServer(function (req, res) {
+  res.writeHead(200, { 'Content-Type': 'text/html' });
+  fs.createReadStream('index.html').pipe(res);
+});
 httpServer.listen(PORT, () => console.log(`Listening.. on ${PORT}`));
 //hashmap clients
 const clients = {};
