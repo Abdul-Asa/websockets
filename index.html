@@ -12,15 +12,12 @@
   var ws = new WebSocket(HOST);
   var el;
 
-  ws.onmessage = function (event) {
-    el = document.getElementById('server-time');
-    el.innerHTML = 'Server time: ' + event.data;
-  };
+
 </script>
 
 <body>
   <h1>Hello World</h1>
-  <div id="server-time"></div>
+  <div>Server up</div>
 </body>
 
 </html>

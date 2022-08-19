@@ -22,9 +22,16 @@ const connect = () =>
     const connection = request.accept(null, request.origin);
     const clientId = guid();
     clients[clientId] = { connection: connection };
+    let ode = [];
+    for (var key in clients) {
+      if (clients.hasOwnProperty(key)) {
+        ode.push({ uN: clients[key].userName, iD: key });
+      }
+    }
     const payLoad = {
       method: 'connect',
       clientId: clientId,
+      clients: [ode],
     };
 
     connection.on('open', () => console.log('opened!'));
