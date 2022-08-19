@@ -1,20 +1,20 @@
 const http = require('http');
-const express = require('express');
+const app = require('express')();
 const websocketServer = require('websocket').server;
 
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT || 8000;
 const INDEX = '/index.html';
-const httpServer = http.createServer();
-httpServer.listen(PORT, () => console.log(`Listening.. on ${PORT}`));
+// const httpServer = http.createServer();
+// httpServer.listen(PORT, () => console.log(`Listening.. on ${PORT}`));
 //hashmap clients
 const clients = {};
 const games = {};
 
 const wsServer = new websocketServer({
-  httpServer: httpServer,
+  httpServer: app,
 });
 
-const server = express()
+app
   .use((req, res) => res.sendFile(INDEX, { root: __dirname }))
   .listen(PORT, () => console.log(`Listening on ${PORT}`));
 
