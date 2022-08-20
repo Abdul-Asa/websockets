@@ -104,7 +104,7 @@ const connect = () =>
       }
       if (result.method === 'rejected') {
         const payLoad = {
-          method: 'lol loser',
+          method: 'lol',
           clientId: result.oppId,
           oppName: result.clientName,
           oppId: clientId,
