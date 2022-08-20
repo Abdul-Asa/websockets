@@ -63,11 +63,12 @@ const connect = () =>
             list.push(wow);
           }
         }
-
+        const roster = uniqBy(list);
+        console.log(list, roster);
         const payLoad = {
           method: 'online',
           clientId: clientId,
-          lobby: list,
+          lobby: roster,
         };
         // const con = clients[clientId].connection;
         // con.send(JSON.stringify(payLoad));
@@ -81,8 +82,6 @@ const connect = () =>
         console.log(clientId);
         delete clients[clientId];
       }
-      //I have received a message from the client
-      //a user want to create a new game
       if (result.method === 'createGame') {
         const clientId = result.clientId;
         const gameId = guid();
@@ -100,6 +99,16 @@ const connect = () =>
         };
         console.log(result);
         console.log(clients[clientId].userName, clients[result.oppId].userName);
+        const con = clients[result.oppId].connection;
+        con.send(JSON.stringify(payLoad));
+      }
+      if (result.method === 'rejected') {
+        const payLoad = {
+          method: 'lol loser',
+          clientId: result.oppId,
+          oppName: result.clientName,
+          oppId: clientId,
+        };
         const con = clients[result.oppId].connection;
         con.send(JSON.stringify(payLoad));
       }
@@ -174,7 +183,6 @@ function updateGameState() {
   setTimeout(updateGameState, 500);
 }
 
-// then to call it, plus stitch in '4' in the third group
 const guid = () => {
   const s4 = () =>
     Math.floor((1 + Math.random()) * 0x10000)
@@ -182,3 +190,32 @@ const guid = () => {
       .substring(1);
   return s4() + s4() + '-' + s4();
 };
+
+function findLastIndex(array, searchKey, searchValue) {
+  var index = array
+    .slice()
+    .reverse()
+    .findIndex((x) => x[searchKey] === searchValue);
+  var count = array.length - 1;
+  var finalIndex = index >= 0 ? count - index : index;
+  return finalIndex;
+}
+
+function uniqBy(a) {
+  const wow = [];
+  const ode = [];
+  const ans = [];
+  a.forEach((el) => {
+    wow.push(el.userName);
+  });
+  const uniqueArray = wow.filter(function (item, pos, self) {
+    return self.indexOf(item) == pos;
+  });
+  uniqueArray.forEach((element) => {
+    ode.push(findLastIndex(a, 'userName', element));
+  });
+  ode.forEach((el) => {
+    ans.push(a[el]);
+  });
+  return ans;
+}
