@@ -33,13 +33,16 @@ const connect = () =>
       clientId: clientId,
       clients: [ode],
     };
-
+    // connection.on('error', (err) => {
+    //   console.error('Socket encountered error: ', err, 'Closing socket');
+    // });
     connection.on('open', () => console.log('opened!'));
     connection.on('close', (e) => {
       console.log(
         'Socket is closed. Reconnect will be attempted in 1 second.',
-        e.reason
+        e
       );
+      connect();
     });
     connection.on('message', (message) => {
       const result = JSON.parse(message.utf8Data);
@@ -88,6 +91,7 @@ const connect = () =>
         games[gameId] = {
           id: gameId,
           clients: [result.clientId, result.oppId],
+          gameStatus: 'pending',
         };
 
         const payLoad = {
@@ -95,53 +99,127 @@ const connect = () =>
           clientId: result.oppId,
           oppName: result.clientName,
           oppId: clientId,
-          game: games[gameId],
+          gameId: gameId,
         };
-        console.log(result);
-        console.log(clients[clientId].userName, clients[result.oppId].userName);
+        const payLoad2 = {
+          method: 'inv',
+          clientId: result.oppId,
+          oppName: result.clientName,
+          oppId: clientId,
+          gameId: gameId,
+        };
         const con = clients[result.oppId].connection;
+        const con2 = clients[result.clientId].connection;
         con.send(JSON.stringify(payLoad));
+        con2.send(JSON.stringify(payLoad2));
       }
       if (result.method === 'rejected') {
+        const gameId = result.gameId;
+        delete games[gameId];
+
         const payLoad = {
           method: 'lol',
           clientId: result.oppId,
           oppName: result.clientName,
           oppId: clientId,
+          gameId: gameId,
+        };
+
+        const con = clients[result.oppId].connection;
+        con.send(JSON.stringify(payLoad));
+      }
+      if (result.method === 'accepted') {
+        const gameId = result.gameId;
+        games[gameId].gameStatus = 'ongoing';
+        const payLoad = {
+          method: 'accepted',
+          clientId: result.oppId,
+          oppName: result.clientName,
+          oppId: clientId,
+          gameId: gameId,
         };
         const con = clients[result.oppId].connection;
         con.send(JSON.stringify(payLoad));
       }
-
-      //a client want to join
-      // if (result.method === 'join') {
-      //   const clientId = result.clientId;
-      //   const userName = result.userName;
-
-      //   const gameId = result.gameId;
-      //   const game = games[gameId];
-      //   if (game.clients.length >= 3) {
-      //     //sorry max players reach
-      //     return;
-      //   }
-      //   // const color = { 0: 'Red', 1: 'Green', 2: 'Blue' }[game.clients.length];
-      //   game.clients.push({
-      //     clientId: clientId,
-      //     userName: userName,
-      //     score: 0,
-      //   });
-      //   //start the game
-      //   if (game.clients.length === 3) updateGameState();
-
-      //   const payLoad = {
-      //     method: 'join',
-      //     game: game,
-      //   };
-      //   //loop through all clients and tell them that people has joined
-      //   game.clients.forEach((c) => {
-      //     clients[c.clientId].connection.send(JSON.stringify(payLoad));
-      //   });
-      // }
+      if (result.method === 'play') {
+        games[gameId].scores = [];
+        const gameId = result.gameId;
+        const clientId = result.clientId;
+        if (games[gameId].clients[0] === clientId) {
+          games[gameId].scores.push(result.scores);
+        }
+        if (games[gameId].clients[1] === clientId) {
+          games[gameId].scores.push(result.scores);
+        }
+        const payLoad = {
+          method: 'play',
+          clientId: result.oppId,
+          oppName: result.clientName,
+          oppId: clientId,
+          gameId: gameId,
+          scores: [games[gameId].scores],
+        };
+        const con = clients[result.oppId].connection;
+        const con2 = clients[result.clientId].connection;
+        con.send(JSON.stringify(payLoad));
+        con2.send(JSON.stringify(payLoad2));
+      }
+      if (result.method === 'endMatch') {
+        const gameId = result.gameId;
+        const clientId = result.clientId;
+        delete games[gameId];
+        const payLoad = {
+          method: 'endedMatch',
+          clientId: result.oppId,
+          oppName: result.clientName,
+          oppId: clientId,
+          gameId: gameId,
+        };
+        const con = clients[result.oppId].connection;
+        con.send(JSON.stringify(payLoad));
+      }
+      if (result.method === 'rematch') {
+        const gameId = result.gameId;
+        const clientId = result.clientId;
+        delete games[gameId];
+        const payLoad = {
+          method: 'endedMatch',
+          clientId: result.oppId,
+          oppName: result.clientName,
+          oppId: clientId,
+          gameId: gameId,
+        };
+        const con = clients[result.oppId].connection;
+        con.send(JSON.stringify(payLoad));
+      }
+      if (result.method === 'acceptRematch') {
+        const gameId = result.gameId;
+        const clientId = result.clientId;
+        delete games[gameId];
+        const payLoad = {
+          method: 'endedMatch',
+          clientId: result.oppId,
+          oppName: result.clientName,
+          oppId: clientId,
+          gameId: gameId,
+        };
+        const con = clients[result.oppId].connection;
+        con.send(JSON.stringify(payLoad));
+      }
+      if (result.method === 'chat') {
+        const gameId = result.gameId;
+        const clientId = result.clientId;
+        delete games[gameId];
+        const payLoad = {
+          method: 'endedMatch',
+          clientId: result.oppId,
+          oppName: result.clientName,
+          oppId: clientId,
+          gameId: gameId,
+        };
+        const con = clients[result.oppId].connection;
+        con.send(JSON.stringify(payLoad));
+      }
       //a user plays
       // if (result.method === 'play') {
       //   const gameId = result.gameId;
@@ -154,34 +232,13 @@ const connect = () =>
       //   games[gameId].state = state;
       // }
     });
-    connection.on('error', (err) => {
-      console.error(
-        'Socket encountered error: ',
-        err.message,
-        'Closing socket'
-      );
-      connect();
-    });
 
     connection.send(JSON.stringify(payLoad));
+    connection.on('error', (err) => {
+      console.error('Socket encountered error: ', err.name, err.message);
+    });
   });
 connect();
-function updateGameState() {
-  //{"gameid", fasdfsf}
-  for (const g of Object.keys(games)) {
-    const game = games[g];
-    const payLoad = {
-      method: 'update',
-      game: game,
-    };
-
-    game.clients.forEach((c) => {
-      clients[c.clientId].connection.send(JSON.stringify(payLoad));
-    });
-  }
-
-  setTimeout(updateGameState, 500);
-}
 
 const guid = () => {
   const s4 = () =>
