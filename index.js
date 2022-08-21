@@ -1,7 +1,7 @@
 const http = require('http');
 var fs = require('fs');
 const websocketServer = require('websocket').server;
-
+const Answers = require('./Answers/Answers');
 const PORT = process.env.PORT || 8000;
 // const INDEX = fs.readFileSync('index.html');
 const httpServer = http.createServer(function (req, res) {
@@ -100,13 +100,15 @@ const connect = () =>
           oppName: result.clientName,
           oppId: clientId,
           gameId: gameId,
+          questions: Answers,
         };
         const payLoad2 = {
           method: 'inv',
-          clientId: result.oppId,
-          oppName: result.clientName,
-          oppId: clientId,
+          clientId: clientId,
+          oppName: result.oppName,
+          oppId: result.oppId,
           gameId: gameId,
+          questions: Answers,
         };
         const con = clients[result.oppId].connection;
         const con2 = clients[result.clientId].connection;
@@ -142,34 +144,25 @@ const connect = () =>
         con.send(JSON.stringify(payLoad));
       }
       if (result.method === 'play') {
-        games[gameId].scores = [];
         const gameId = result.gameId;
         const clientId = result.clientId;
-        if (games[gameId].clients[0] === clientId) {
-          games[gameId].scores.push(result.scores);
-        }
-        if (games[gameId].clients[1] === clientId) {
-          games[gameId].scores.push(result.scores);
-        }
         const payLoad = {
           method: 'play',
           clientId: result.oppId,
           oppName: result.clientName,
           oppId: clientId,
           gameId: gameId,
-          scores: [games[gameId].scores],
+          oppScores: result.score,
         };
         const con = clients[result.oppId].connection;
-        const con2 = clients[result.clientId].connection;
         con.send(JSON.stringify(payLoad));
-        con2.send(JSON.stringify(payLoad2));
       }
       if (result.method === 'endMatch') {
         const gameId = result.gameId;
         const clientId = result.clientId;
         delete games[gameId];
         const payLoad = {
-          method: 'endedMatch',
+          method: 'endMatch',
           clientId: result.oppId,
           oppName: result.clientName,
           oppId: clientId,
