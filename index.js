@@ -158,7 +158,6 @@ wsServer.on('request', (request) => {
       }
     }
     if (result.method === 'endMatch') {
-      console.log(result);
       const oppId = result.oppId;
       const clientId = result.clientId;
       wsServer.connections.forEach((el) => {
