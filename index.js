@@ -10,228 +10,178 @@ const httpServer = http.createServer(function (req, res) {
 });
 httpServer.listen(PORT, () => console.log(`Listening.. on ${PORT}`));
 //hashmap clients
-const clients = {};
-const games = {};
+// const clients = {};
+let wait = [];
 
 const wsServer = new websocketServer({
   httpServer: httpServer,
 });
 
-const connect = () =>
-  wsServer.on('request', (request) => {
-    const connection = request.accept(null, request.origin);
-    const clientId = guid();
-    clients[clientId] = { connection: connection };
-    let ode = [];
-    for (var key in clients) {
-      if (clients.hasOwnProperty(key)) {
-        ode.push({ uN: clients[key].userName, iD: key });
+wsServer.on('request', (request) => {
+  const connection = request.accept(null, request.origin);
+  const clientId = guid();
+  //On open connection
+  connection.id = clientId;
+  const payLoad = {
+    method: 'connect',
+    clientId: clientId,
+  };
+  connection.send(JSON.stringify(payLoad));
+  connection.on('close', () => {
+    const wow = [];
+    wsServer.connections.forEach((el) => {
+      if (el.userName && el.connected) {
+        wow.push({ id: el.id, userName: el.userName });
+      }
+    });
+    const payLoad = {
+      method: 'online',
+      lobby: wow,
+    };
+    wsServer.connections.forEach((el) => el.send(JSON.stringify(payLoad)));
+  });
+  connection.on('message', (message) => {
+    const result = JSON.parse(message.utf8Data);
+    if (result.method === 'connected') {
+      connection.userName = result.userName;
+      connection.match = '';
+      const wow = [];
+      wsServer.connections.forEach((el) => {
+        if (el.userName) {
+          wow.push({ id: el.id, userName: el.userName });
+        }
+      });
+      const payLoad = {
+        method: 'online',
+        lobby: wow,
+      };
+      wsServer.connections.forEach((el) => el.send(JSON.stringify(payLoad)));
+    }
+    if (result.method === 'createGame') {
+      const oppId = result.oppId;
+      const clientId = result.clientId;
+      const gameId = guid();
+      let message = 'Waiting for response...';
+      wsServer.connections.forEach((el) => {
+        if (el.id === oppId) {
+          if (el.match !== '') {
+            message = result.oppName + ' is in a match';
+          } else {
+            el.match = gameId;
+            wsServer.connections.forEach((el) => {
+              if (el.id === clientId) {
+                el.match = gameId;
+              }
+            });
+          }
+        }
+      });
+      let ode = '';
+      message === 'Waiting for response...' ? (ode = gameId) : (ode = '');
+      const payLoad1 = {
+        method: 'invite',
+        message: message,
+        gameId: ode,
+      };
+      const payLoad2 = {
+        method: 'invitation',
+        oppName: result.clientName,
+        oppId: clientId,
+        gameId: ode,
+      };
+      wsServer.connections.forEach((el) => {
+        if (el.id === clientId) el.send(JSON.stringify(payLoad1));
+        if (message === 'Waiting for response...') {
+          if (el.id === oppId) el.send(JSON.stringify(payLoad2));
+        }
+      });
+    }
+    if (result.method === 'rejected') {
+      const oppId = result.oppId;
+      const clientId = result.clientId;
+      wsServer.connections.forEach((el) => {
+        if (el.id === oppId) el.match = '';
+        if (el.id === clientId) el.match = '';
+      });
+      const payLoad = {
+        method: 'lol',
+        clientId: result.oppId,
+        oppName: result.clientName,
+        oppId: clientId,
+      };
+
+      wsServer.connections.forEach((el) => {
+        if (el.id === clientId) el.send(JSON.stringify(payLoad));
+        if (el.id === oppId) el.send(JSON.stringify(payLoad));
+      });
+    }
+    if (result.method === 'accepted') {
+      const payLoad = {
+        method: 'noice',
+        questions: Answers,
+      };
+      wsServer.connections.forEach((el) => {
+        if (el.id === result.oppId) el.send(JSON.stringify(payLoad));
+        if (el.id === result.clientId) el.send(JSON.stringify(payLoad));
+      });
+    }
+    if (result.method === 'play') {
+      const gameId = result.gameId;
+      wait.push(gameId);
+      if (wait.length == 1) {
+        const payLoad = {
+          method: 'wait',
+          clientId: result.clientId,
+          clientName: result.clientName,
+          oppId: result.oppId,
+          oppName: result.oppName,
+          score: result.score,
+        };
+        wsServer.connections.forEach((el) => {
+          if (el.id === result.oppId) el.send(JSON.stringify(payLoad));
+          if (el.id === result.clientId) el.send(JSON.stringify(payLoad));
+        });
+      } else {
+        const payLoad = {
+          method: 'round',
+          clientId: result.clientId,
+          clientName: result.clientName,
+          oppId: result.oppId,
+          oppName: result.oppName,
+          score: result.score,
+        };
+        wsServer.connections.forEach((el) => {
+          if (el.id === result.oppId) el.send(JSON.stringify(payLoad));
+          if (el.id === result.clientId) el.send(JSON.stringify(payLoad));
+        });
+        wait = [];
       }
     }
-    const payLoad = {
-      method: 'connect',
-      clientId: clientId,
-      clients: [ode],
-    };
-    // connection.on('error', (err) => {
-    //   console.error('Socket encountered error: ', err, 'Closing socket');
-    // });
-    connection.on('open', () => console.log('opened!'));
-    connection.on('close', (e) => {
-      console.log(
-        'Socket is closed. Reconnect will be attempted in 1 second.',
-        e
-      );
-      connect();
-    });
-    connection.on('message', (message) => {
-      const result = JSON.parse(message.utf8Data);
-      if (result.method === 'connected') {
-        const clientId = result.clientId;
-        clients[clientId].userName = result.userName;
-        let list = [];
-        for (var key in clients) {
-          if (clients.hasOwnProperty(key)) {
-            if (!clients[key].userName) {
-              delete clients[key];
-            }
-          }
-        }
-        for (var key in clients) {
-          if (clients.hasOwnProperty(key)) {
-            const wow = {
-              userName: clients[key].userName,
-              iD: key,
-            };
-            list.push(wow);
-          }
-        }
-        const roster = uniqBy(list);
-        console.log(list, roster);
-        const payLoad = {
-          method: 'online',
-          clientId: clientId,
-          lobby: roster,
-        };
-        // const con = clients[clientId].connection;
-        // con.send(JSON.stringify(payLoad));
+    if (result.method === 'endMatch') {
+      console.log(result);
+      const oppId = result.oppId;
+      const clientId = result.clientId;
+      wsServer.connections.forEach((el) => {
+        if (el.id === oppId) el.match = '';
+        if (el.id === clientId) el.match = '';
+      });
+      const payLoad = {
+        method: 'quit',
+        clientId: result.oppId,
+        oppName: result.clientName,
+        oppId: clientId,
+      };
 
-        for (key in clients) {
-          clients[key].connection.send(JSON.stringify(payLoad));
-        }
-      }
-      if (result.method === 'disconnected') {
-        const clientId = result.clientId;
-        console.log(clientId);
-        delete clients[clientId];
-      }
-      if (result.method === 'createGame') {
-        const clientId = result.clientId;
-        const gameId = guid();
-        games[gameId] = {
-          id: gameId,
-          clients: [result.clientId, result.oppId],
-          gameStatus: 'pending',
-        };
-
-        const payLoad = {
-          method: 'inviteGame',
-          clientId: result.oppId,
-          oppName: result.clientName,
-          oppId: clientId,
-          gameId: gameId,
-          questions: Answers,
-        };
-        const payLoad2 = {
-          method: 'inv',
-          clientId: clientId,
-          oppName: result.oppName,
-          oppId: result.oppId,
-          gameId: gameId,
-          questions: Answers,
-        };
-        const con = clients[result.oppId].connection;
-        const con2 = clients[result.clientId].connection;
-        con.send(JSON.stringify(payLoad));
-        con2.send(JSON.stringify(payLoad2));
-      }
-      if (result.method === 'rejected') {
-        const gameId = result.gameId;
-        delete games[gameId];
-
-        const payLoad = {
-          method: 'lol',
-          clientId: result.oppId,
-          oppName: result.clientName,
-          oppId: clientId,
-          gameId: gameId,
-        };
-
-        const con = clients[result.oppId].connection;
-        con.send(JSON.stringify(payLoad));
-      }
-      if (result.method === 'accepted') {
-        const gameId = result.gameId;
-        games[gameId].gameStatus = 'ongoing';
-        const payLoad = {
-          method: 'accepted',
-          clientId: result.oppId,
-          oppName: result.clientName,
-          oppId: clientId,
-          gameId: gameId,
-        };
-        const con = clients[result.oppId].connection;
-        con.send(JSON.stringify(payLoad));
-      }
-      if (result.method === 'play') {
-        const gameId = result.gameId;
-        const clientId = result.clientId;
-        const payLoad = {
-          method: 'play',
-          clientId: result.oppId,
-          oppName: result.clientName,
-          oppId: clientId,
-          gameId: gameId,
-          oppScores: result.score,
-        };
-        const con = clients[result.oppId].connection;
-        con.send(JSON.stringify(payLoad));
-      }
-      if (result.method === 'endMatch') {
-        const gameId = result.gameId;
-        const clientId = result.clientId;
-        delete games[gameId];
-        const payLoad = {
-          method: 'endMatch',
-          clientId: result.oppId,
-          oppName: result.clientName,
-          oppId: clientId,
-          gameId: gameId,
-        };
-        const con = clients[result.oppId].connection;
-        con.send(JSON.stringify(payLoad));
-      }
-      if (result.method === 'rematch') {
-        const gameId = result.gameId;
-        const clientId = result.clientId;
-        delete games[gameId];
-        const payLoad = {
-          method: 'endedMatch',
-          clientId: result.oppId,
-          oppName: result.clientName,
-          oppId: clientId,
-          gameId: gameId,
-        };
-        const con = clients[result.oppId].connection;
-        con.send(JSON.stringify(payLoad));
-      }
-      if (result.method === 'acceptRematch') {
-        const gameId = result.gameId;
-        const clientId = result.clientId;
-        delete games[gameId];
-        const payLoad = {
-          method: 'endedMatch',
-          clientId: result.oppId,
-          oppName: result.clientName,
-          oppId: clientId,
-          gameId: gameId,
-        };
-        const con = clients[result.oppId].connection;
-        con.send(JSON.stringify(payLoad));
-      }
-      if (result.method === 'chat') {
-        const gameId = result.gameId;
-        const clientId = result.clientId;
-        delete games[gameId];
-        const payLoad = {
-          method: 'endedMatch',
-          clientId: result.oppId,
-          oppName: result.clientName,
-          oppId: clientId,
-          gameId: gameId,
-        };
-        const con = clients[result.oppId].connection;
-        con.send(JSON.stringify(payLoad));
-      }
-      //a user plays
-      // if (result.method === 'play') {
-      //   const gameId = result.gameId;
-      //   // const ballId = result.ballId;
-      //   const score = result.score;
-      //   let state = games[gameId].state;
-      //   if (!state) state = {};
-
-      //   state[score] = score;
-      //   games[gameId].state = state;
-      // }
-    });
-
-    connection.send(JSON.stringify(payLoad));
-    connection.on('error', (err) => {
-      console.error('Socket encountered error: ', err.name, err.message);
-    });
+      wsServer.connections.forEach((el) => {
+        if (el.id === clientId) el.send(JSON.stringify(payLoad));
+        if (el.id === oppId) el.send(JSON.stringify(payLoad));
+      });
+    }
   });
-connect();
+  connection.on('error', (err) => {
+    console.error('Socket encountered error: ', err.name, err.message);
+  });
+});
 
 const guid = () => {
   const s4 = () =>
@@ -240,7 +190,6 @@ const guid = () => {
       .substring(1);
   return s4() + s4() + '-' + s4();
 };
-
 function findLastIndex(array, searchKey, searchValue) {
   var index = array
     .slice()
