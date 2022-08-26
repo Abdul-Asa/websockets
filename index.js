@@ -157,7 +157,7 @@ wsServer.on('request', (request) => {
         wait = [];
       }
     }
-    if (result.method === 'endMatch') {
+    if (result.method === 'quitMatch') {
       const oppId = result.oppId;
       const clientId = result.clientId;
       wsServer.connections.forEach((el) => {
@@ -166,6 +166,25 @@ wsServer.on('request', (request) => {
       });
       const payLoad = {
         method: 'quit',
+        clientId: result.oppId,
+        oppName: result.clientName,
+        oppId: clientId,
+      };
+
+      wsServer.connections.forEach((el) => {
+        if (el.id === clientId) el.send(JSON.stringify(payLoad));
+        if (el.id === oppId) el.send(JSON.stringify(payLoad));
+      });
+    }
+    if (result.method === 'endMatch') {
+      const oppId = result.oppId;
+      const clientId = result.clientId;
+      wsServer.connections.forEach((el) => {
+        if (el.id === oppId) el.match = '';
+        if (el.id === clientId) el.match = '';
+      });
+      const payLoad = {
+        method: 'end',
         clientId: result.oppId,
         oppName: result.clientName,
         oppId: clientId,
