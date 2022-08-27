@@ -116,9 +116,10 @@ wsServer.on('request', (request) => {
       });
     }
     if (result.method === 'accepted') {
+      const quekchon = shuffle(Answers.Ideas).slice(0, 5);
       const payLoad = {
         method: 'noice',
-        questions: Answers,
+        questions: quekchon,
       };
       wsServer.connections.forEach((el) => {
         if (el.id === result.oppId) el.send(JSON.stringify(payLoad));
@@ -235,4 +236,23 @@ function uniqBy(a) {
     ans.push(a[el]);
   });
   return ans;
+}
+function shuffle(array) {
+  let currentIndex = array.length,
+    randomIndex;
+
+  // While there remain elements to shuffle.
+  while (currentIndex !== 0) {
+    // Pick a remaining element.
+    randomIndex = Math.floor(Math.random() * currentIndex);
+    currentIndex--;
+
+    // And swap it with the current element.
+    [array[currentIndex], array[randomIndex]] = [
+      array[randomIndex],
+      array[currentIndex],
+    ];
+  }
+
+  return array;
 }
